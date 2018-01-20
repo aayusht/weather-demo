@@ -26,7 +26,7 @@ import android.util.Log
 import android.view.Gravity
 import android.widget.CursorAdapter
 import android.widget.Toast
-import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.*
 
 
 //Global constants
@@ -34,7 +34,7 @@ const val WEATHER_ENDPOINT = "https://api.wunderground.com/api/24f0b7e4ed53f605/
 const val AUTOCOMPLETE_ENDPOINT = "https://autocomplete.wunderground.com/aq?query="
 const val DELAY = 500L // milliseconds
 const val MY_PERMISSION_ACCESS_COURSE_LOCATION = 69
-var sAutocompleteColNames = arrayOf(BaseColumns._ID, // necessary for adapter
+val sAutocompleteColNames = arrayOf(BaseColumns._ID, // necessary for adapter
         SearchManager.SUGGEST_COLUMN_TEXT_1,      // the full search term
         SearchManager.EXTRA_DATA_KEY // full json
 )
@@ -53,13 +53,27 @@ class MainActivity : AppCompatActivity() {
     private var timerTask: TimerTask? = null
     private val timer = Timer()
     private lateinit var searchView: SearchView
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var locationCallback: LocationCallback
     private var location: Location? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        locationCallback = object: LocationCallback() {
+            override fun onLocationResult(result: LocationResult?) {
+                if (result != null) {
+                    for (location in result.locations) {
+                        this@MainActivity.location = location
+                        Log.d("location", location.toString())
+                    }
+                } else {
+                    Log.d("location", "location is null")
+                }
+            }
+        }
         if ( ContextCompat.checkSelfPermission( this, android.Manifest.permission.ACCESS_COARSE_LOCATION ) != PackageManager.PERMISSION_GRANTED ) {
-
             ActivityCompat.requestPermissions( this,
                     arrayOf(android.Manifest.permission.ACCESS_COARSE_LOCATION),
                     MY_PERMISSION_ACCESS_COURSE_LOCATION );
@@ -138,11 +152,26 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startLocationUpdates() {
+        if ( ContextCompat.checkSelfPermission( this, android.Manifest.permission.ACCESS_COARSE_LOCATION ) == PackageManager.PERMISSION_GRANTED ) {
+            fusedLocationClient.lastLocation.addOnSuccessListener { location = it }
+            fusedLocationClient.requestLocationUpdates(createLocationRequest(),
+                    locationCallback,
+                    null /* Looper */)
+        } else {
+            Log.d("location updates", "permission denied")
+        }
+    }
 
+    private fun createLocationRequest(): LocationRequest {
+        val locationRequest = LocationRequest()
+        locationRequest.interval = 100000L
+        locationRequest.fastestInterval = 60000L
+        locationRequest.priority = LocationRequest.PRIORITY_LOW_POWER
+        return locationRequest
     }
 
     private fun stopLocationUpdates() {
-
+        fusedLocationClient.removeLocationUpdates(locationCallback);
     }
 
     private fun getPredictions(query: String) {
@@ -166,12 +195,22 @@ class MainActivity : AppCompatActivity() {
                             val scanner = Scanner(inputStream).useDelimiter("\\A")
                             val response = if(scanner.hasNext()) scanner.next() else ""
                             val placesJSON = JSONObject(response).getJSONArray("RESULTS")
-                            (0 until placesJSON.length())
-                                    .map { arrayOf(it,
-                                            placesJSON.getJSONObject(it).getString("name"),
-                                            placesJSON.getJSONObject(it).toString())
-                                    }
-                                    .forEach { cursor.addRow(it) }
+                            var rows: MutableList<Array<Any>> = mutableListOf()
+                            for (i in 0 until placesJSON.length()) {
+                                rows.add(arrayOf(i, //does this have to change if I sort?
+                                        placesJSON.getJSONObject(i).getString("name"),
+                                        placesJSON.getJSONObject(i).toString()))
+                            }
+                            if (location != null) {
+                                rows.sortBy {
+                                    val location = Location("")
+                                    location.latitude = JSONObject(it[2] as String).getDouble("lat")
+                                    location.longitude = JSONObject(it[2] as String).getDouble("lon")
+                                    return@sortBy location.distanceTo(this@MainActivity.location)
+                                }
+                                rows.add(0, arrayOf(rows.size + 1, "Current Location", "${location!!.latitude} ${location!!.longitude}"))
+                            }
+                            rows.forEach { cursor.addRow(it) }
 
                             return cursor
                         }
