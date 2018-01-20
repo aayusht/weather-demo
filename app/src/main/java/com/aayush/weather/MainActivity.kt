@@ -25,6 +25,7 @@ import android.support.v7.app.ActionBar
 import android.util.Log
 import android.view.Gravity
 import android.widget.CursorAdapter
+import android.widget.TextView
 import android.widget.Toast
 import com.google.android.gms.location.*
 
@@ -135,9 +136,10 @@ class MainActivity : AppCompatActivity() {
 
                     val cursor = searchView.suggestionsAdapter.getItem(position) as Cursor
                     val term = cursor.getString(cursor.getColumnIndex(SearchManager.SUGGEST_COLUMN_TEXT_1))
-                    val data = cursor.getString(cursor.getColumnIndex(SearchManager.EXTRA_DATA_KEY))
+                    val data = JSONObject(cursor.getString(cursor.getColumnIndex(SearchManager.EXTRA_DATA_KEY)).replace("\\", ""))
                     cursor.close()
-                    Toast.makeText(applicationContext, data, Toast.LENGTH_SHORT).show()
+
+                    fetchWeatherData(URL(WEATHER_ENDPOINT + data.getString("l") + ".json"))
 
                     return true
                 }
@@ -149,6 +151,23 @@ class MainActivity : AppCompatActivity() {
         }
 
         return true
+    }
+
+    private fun fetchWeatherData(url: URL) {
+        (@SuppressLint("StaticFieldLeak")
+        object: AsyncTask<Void, Void, JSONObject>() {
+            override fun doInBackground(vararg p0: Void?): JSONObject {
+                val httpConnection = url.openConnection() as HttpURLConnection
+                httpConnection.requestMethod = "GET"
+                val inputStream = BufferedInputStream(httpConnection.inputStream)
+                val scanner = Scanner(inputStream).useDelimiter("\\A")
+                return JSONObject(if(scanner.hasNext()) scanner.next() else "")
+            }
+
+            override fun onPostExecute(result: JSONObject?) {
+                findViewById<TextView>(R.id.dataText).text = result.toString()
+            }
+        }).execute()
     }
 
     private fun startLocationUpdates() {
@@ -195,11 +214,11 @@ class MainActivity : AppCompatActivity() {
                             val scanner = Scanner(inputStream).useDelimiter("\\A")
                             val response = if(scanner.hasNext()) scanner.next() else ""
                             val placesJSON = JSONObject(response).getJSONArray("RESULTS")
-                            var rows: MutableList<Array<Any>> = mutableListOf()
-                            for (i in 0 until placesJSON.length()) {
-                                rows.add(arrayOf(i, //does this have to change if I sort?
-                                        placesJSON.getJSONObject(i).getString("name"),
-                                        placesJSON.getJSONObject(i).toString()))
+                            val rows: MutableList<Array<Any>> = mutableListOf()
+                            (0 until placesJSON.length()).mapTo(rows) {
+                                arrayOf(it, //does this have to change if I sort?
+                                        placesJSON.getJSONObject(it).getString("name"),
+                                        placesJSON.getJSONObject(it).toString())
                             }
                             if (location != null) {
                                 rows.sortBy {
@@ -208,7 +227,8 @@ class MainActivity : AppCompatActivity() {
                                     location.longitude = JSONObject(it[2] as String).getDouble("lon")
                                     return@sortBy location.distanceTo(this@MainActivity.location)
                                 }
-                                rows.add(0, arrayOf(rows.size + 1, "Current Location", "${location!!.latitude} ${location!!.longitude}"))
+                                rows.add(0, arrayOf(rows.size + 1, "Current Location",
+                                        "{\"l\": \"/q/${location!!.latitude},${location!!.longitude}\"}"))
                             }
                             rows.forEach { cursor.addRow(it) }
 
