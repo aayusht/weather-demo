@@ -22,6 +22,8 @@ import android.location.Location
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
 import android.support.v7.app.ActionBar
+import android.support.v7.widget.LinearLayoutManager
+import android.support.v7.widget.RecyclerView
 import android.util.Log
 import android.view.Gravity
 import android.widget.CursorAdapter
@@ -74,7 +76,8 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        if ( ContextCompat.checkSelfPermission( this, android.Manifest.permission.ACCESS_COARSE_LOCATION ) != PackageManager.PERMISSION_GRANTED ) {
+        if ( ContextCompat.checkSelfPermission( this, android.Manifest.permission.ACCESS_COARSE_LOCATION )
+                != PackageManager.PERMISSION_GRANTED ) {
             ActivityCompat.requestPermissions( this,
                     arrayOf(android.Manifest.permission.ACCESS_COARSE_LOCATION),
                     MY_PERMISSION_ACCESS_COURSE_LOCATION );
@@ -112,7 +115,8 @@ class MainActivity : AppCompatActivity() {
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.menu, menu)
         if (menu != null) {
-            searchView = menu.findItem(R.id.action_search).actionView as SearchView
+            val searchMenuItem = menu.findItem(R.id.action_search)
+            searchView = searchMenuItem.actionView as SearchView
             searchView.layoutParams = ActionBar.LayoutParams(Gravity.RIGHT)
             searchView.suggestionsAdapter = SimpleCursorAdapter(
                     applicationContext, R.layout.list_item, null,
@@ -123,8 +127,8 @@ class MainActivity : AppCompatActivity() {
                 override fun onQueryTextSubmit(p0: String?) = true
 
                 override fun onQueryTextChange(string: String?): Boolean {
-                    searchView.suggestionsAdapter.changeCursor(null)
-                    if (string != null && string.isNotEmpty()) {
+                    if (string != null && string.length > 2) {
+                        searchView.suggestionsAdapter.changeCursor(null)
                         getPredictions(string)
                     }
                     return true
@@ -135,12 +139,12 @@ class MainActivity : AppCompatActivity() {
                 override fun onSuggestionSelect(position: Int): Boolean {
 
                     val cursor = searchView.suggestionsAdapter.getItem(position) as Cursor
-                    val term = cursor.getString(cursor.getColumnIndex(SearchManager.SUGGEST_COLUMN_TEXT_1))
                     val data = JSONObject(cursor.getString(cursor.getColumnIndex(SearchManager.EXTRA_DATA_KEY)).replace("\\", ""))
                     cursor.close()
 
                     fetchWeatherData(URL(WEATHER_ENDPOINT + data.getString("l") + ".json"))
-
+                    searchMenuItem.collapseActionView()
+                    supportActionBar?.title = cursor.getString(cursor.getColumnIndex(SearchManager.SUGGEST_COLUMN_TEXT_1))
                     return true
                 }
 
@@ -165,7 +169,11 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onPostExecute(result: JSONObject?) {
-                findViewById<TextView>(R.id.dataText).text = result.toString()
+                if (result != null) {
+                    val recyclerView = findViewById<RecyclerView>(R.id.recyclerView)
+                    recyclerView.layoutManager = LinearLayoutManager(this@MainActivity)
+                    recyclerView.adapter = WeatherAdapter(this@MainActivity, result)
+                }
             }
         }).execute()
     }
