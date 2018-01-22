@@ -26,6 +26,7 @@ import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
 import android.util.Log
 import android.view.Gravity
+import android.view.View
 import android.widget.CursorAdapter
 import android.widget.TextView
 import android.widget.Toast
@@ -58,11 +59,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var searchView: SearchView
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
+    private val loadingCursor = MatrixCursor(sAutocompleteColNames)
     private var location: Location? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        loadingCursor.addRow(arrayOf(420, "Loading...", ""))
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         locationCallback = object: LocationCallback() {
             override fun onLocationResult(result: LocationResult?) {
@@ -127,9 +130,11 @@ class MainActivity : AppCompatActivity() {
                 override fun onQueryTextSubmit(p0: String?) = true
 
                 override fun onQueryTextChange(string: String?): Boolean {
-                    if (string != null && string.length > 2) {
-                        searchView.suggestionsAdapter.changeCursor(null)
-                        getPredictions(string)
+                    if (string != null) {
+                        if (string.length > 2) {
+                            searchView.suggestionsAdapter.changeCursor(loadingCursor)
+                            getPredictions(string)
+                        } else searchView.suggestionsAdapter.changeCursor(null)
                     }
                     return true
                 }
@@ -137,14 +142,15 @@ class MainActivity : AppCompatActivity() {
             searchView.setOnSuggestionListener(object : SearchView.OnSuggestionListener {
 
                 override fun onSuggestionSelect(position: Int): Boolean {
-
                     val cursor = searchView.suggestionsAdapter.getItem(position) as Cursor
-                    val data = JSONObject(cursor.getString(cursor.getColumnIndex(SearchManager.EXTRA_DATA_KEY)).replace("\\", ""))
-                    cursor.close()
+                    if (cursor != loadingCursor) {
+                        val data = JSONObject(cursor.getString(cursor.getColumnIndex(SearchManager.EXTRA_DATA_KEY)))
+                        cursor.close()
 
-                    fetchWeatherData(URL(WEATHER_ENDPOINT + data.getString("l") + ".json"))
-                    searchMenuItem.collapseActionView()
-                    supportActionBar?.title = cursor.getString(cursor.getColumnIndex(SearchManager.SUGGEST_COLUMN_TEXT_1))
+                        fetchWeatherData(URL(WEATHER_ENDPOINT + data.getString("l") + ".json"))
+                        searchMenuItem.collapseActionView()
+                        supportActionBar?.title = cursor.getString(cursor.getColumnIndex(SearchManager.SUGGEST_COLUMN_TEXT_1))
+                    }
                     return true
                 }
 
@@ -170,6 +176,7 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPostExecute(result: JSONObject?) {
                 if (result != null) {
+                    findViewById<TextView>(R.id.loadingText).visibility = View.GONE
                     val recyclerView = findViewById<RecyclerView>(R.id.recyclerView)
                     recyclerView.layoutManager = LinearLayoutManager(this@MainActivity)
                     recyclerView.adapter = WeatherAdapter(this@MainActivity, result)
