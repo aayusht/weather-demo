@@ -22,10 +22,10 @@
         android:id="@+id/poweredBy"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:background="?android:attr/windowBackground"
+        android:background="#88fafafa"
+        android:elevation="2dp"
         android:padding="8dp"
         android:text="Powered by Wunderground"
-        android:elevation="2dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 

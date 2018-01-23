@@ -31,6 +31,7 @@ import android.widget.CursorAdapter
 import android.widget.TextView
 import android.widget.Toast
 import com.google.android.gms.location.*
+import java.net.URLEncoder
 
 
 //Global constants
@@ -148,6 +149,9 @@ class MainActivity : AppCompatActivity() {
                         cursor.close()
 
                         fetchWeatherData(URL(WEATHER_ENDPOINT + data.getString("l") + ".json"))
+                        searchView.setQuery("", false)
+                        searchView.isIconified = true
+                        searchView.clearFocus()
                         searchMenuItem.collapseActionView()
                         supportActionBar?.title = cursor.getString(cursor.getColumnIndex(SearchManager.SUGGEST_COLUMN_TEXT_1))
                     }
@@ -222,7 +226,7 @@ class MainActivity : AppCompatActivity() {
                     object: AsyncTask<Void, Void, Cursor>() {
                         override fun doInBackground(vararg p0: Void?): Cursor {
                             val cursor = MatrixCursor(sAutocompleteColNames)
-                            val url = URL(AUTOCOMPLETE_ENDPOINT + query)
+                            val url = URL(AUTOCOMPLETE_ENDPOINT + URLEncoder.encode(query, "UTF-8"))
                             val httpConnection = url.openConnection() as HttpURLConnection
                             httpConnection.requestMethod = "GET"
                             val inputStream = BufferedInputStream(httpConnection.inputStream)
