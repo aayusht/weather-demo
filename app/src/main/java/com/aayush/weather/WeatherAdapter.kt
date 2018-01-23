@@ -12,6 +12,9 @@ import org.json.JSONObject
 
 /**
  * Created by aayush on 1/21/18.
+ *
+ * Adapter for 10 day forecast
+ * Kotlin makes this so much easier :)
  */
 class WeatherAdapter(val context: Context, data: JSONObject): RecyclerView.Adapter<WeatherAdapter.CustomViewHolder>() {
     private val weatherData = arrayListOf<WeatherData>()
@@ -21,7 +24,8 @@ class WeatherAdapter(val context: Context, data: JSONObject): RecyclerView.Adapt
         for (i in 0 until 10) {
             val dayData = forecastData.getJSONObject(i).getJSONObject("date")
             weatherData.add(WeatherData(
-                    if (i == 0) "Today" else "${dayData.getString("weekday")}, ${dayData.getString("monthname_short")} ${dayData.getString("day")}",
+                    if (i == 0) "Today"
+                    else "${dayData.getString("weekday")}, ${dayData.getString("monthname_short")} ${dayData.getString("day")}",
                     forecastText.getJSONObject(2 * i).getString("icon_url"),
                     forecastText.getJSONObject(2 * i).getString("fcttext"),
                     forecastData.getJSONObject(i).getJSONObject("high").getInt("fahrenheit"),
@@ -37,11 +41,11 @@ class WeatherAdapter(val context: Context, data: JSONObject): RecyclerView.Adapt
     override fun getItemCount() = 10
 
     inner class CustomViewHolder(v: View): RecyclerView.ViewHolder(v) {
-        val icon: ImageView = v.findViewById(R.id.icon)
-        val day: TextView = v.findViewById(R.id.day)
-        val desc: TextView = v.findViewById(R.id.desc)
-        val high: TextView = v.findViewById(R.id.high)
-        val low: TextView = v.findViewById(R.id.low)
+        private val icon: ImageView = v.findViewById(R.id.icon)
+        private val day: TextView = v.findViewById(R.id.day)
+        private val desc: TextView = v.findViewById(R.id.desc)
+        private val high: TextView = v.findViewById(R.id.high)
+        private val low: TextView = v.findViewById(R.id.low)
 
         fun bind(weatherData: WeatherData) {
             Glide.with(context).load(weatherData.iconUrl).into(icon)

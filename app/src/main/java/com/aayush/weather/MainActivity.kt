@@ -16,7 +16,6 @@ import android.database.Cursor
 import android.support.v4.widget.SimpleCursorAdapter
 import android.provider.BaseColumns
 import android.database.MatrixCursor
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.support.v4.app.ActivityCompat
@@ -60,23 +59,20 @@ class MainActivity : AppCompatActivity() {
     private lateinit var searchView: SearchView
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
-    private val loadingCursor = MatrixCursor(sAutocompleteColNames)
+    private val loadingCursor = MatrixCursor(sAutocompleteColNames) //dummy cursor instead of null
     private var location: Location? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         loadingCursor.addRow(arrayOf(420, "Loading...", ""))
+
+        //init location stuff, may not be used if no permission or cant get location
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         locationCallback = object: LocationCallback() {
             override fun onLocationResult(result: LocationResult?) {
                 if (result != null) {
-                    for (location in result.locations) {
-                        this@MainActivity.location = location
-                        Log.d("location", location.toString())
-                    }
-                } else {
-                    Log.d("location", "location is null")
+                    for (location in result.locations) this@MainActivity.location = location
                 }
             }
         }
@@ -105,7 +101,6 @@ class MainActivity : AppCompatActivity() {
                                             permissions: Array<String>, grantResults: IntArray) {
         when (requestCode) {
             MY_PERMISSION_ACCESS_COURSE_LOCATION -> {
-                // If request is cancelled, the result arrays are empty.
                 if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
                     startLocationUpdates()
                 } else {
@@ -167,6 +162,10 @@ class MainActivity : AppCompatActivity() {
         return true
     }
 
+    /**
+     * Fetches weather data from wunderground forecast10day query and attaches to RecyclerView
+     * @param url endpoint to fetch weather data from
+     */
     private fun fetchWeatherData(url: URL) {
         (@SuppressLint("StaticFieldLeak")
         object: AsyncTask<Void, Void, JSONObject>() {
@@ -189,6 +188,9 @@ class MainActivity : AppCompatActivity() {
         }).execute()
     }
 
+    /**
+     * Attempts to get location and starts location updates
+     */
     private fun startLocationUpdates() {
         if ( ContextCompat.checkSelfPermission( this, android.Manifest.permission.ACCESS_COARSE_LOCATION ) == PackageManager.PERMISSION_GRANTED ) {
             fusedLocationClient.lastLocation.addOnSuccessListener { location = it }
@@ -200,6 +202,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Creates a location request around evey minute with low priority
+     */
     private fun createLocationRequest(): LocationRequest {
         val locationRequest = LocationRequest()
         locationRequest.interval = 100000L
@@ -208,10 +213,17 @@ class MainActivity : AppCompatActivity() {
         return locationRequest
     }
 
+    /**
+     * Stops location updates
+     */
     private fun stopLocationUpdates() {
         fusedLocationClient.removeLocationUpdates(locationCallback);
     }
 
+    /**
+     * To avoid unnecessary API calls, the asynctask is only executed if there has not been an
+     * API call in DELAY milliseconds.
+     */
     private fun getPredictions(query: String) {
         if (timerTask != null) {
             timerTask?.cancel()
@@ -222,6 +234,7 @@ class MainActivity : AppCompatActivity() {
             override fun run() {
                 runOnUiThread {
                     timerTask = null
+                    //Autocomplete endpoint to retrieve valid city / area names
                     (@SuppressLint("StaticFieldLeak")
                     object: AsyncTask<Void, Void, Cursor>() {
                         override fun doInBackground(vararg p0: Void?): Cursor {
@@ -239,6 +252,7 @@ class MainActivity : AppCompatActivity() {
                                         placesJSON.getJSONObject(it).getString("name"),
                                         placesJSON.getJSONObject(it).toString())
                             }
+                            //sort by closeness to current location if we have it
                             if (location != null) {
                                 rows.sortBy {
                                     val location = Location("")
